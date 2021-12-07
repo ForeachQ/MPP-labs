@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-16"?>
+<rootTrace xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ThreadTrace id="1" time="265">
+    <methods time="133" name="MyMethod" class="Foo">
+      <methods time="132" name="InnerMethod" class="Bar" />
+    </methods>
+  </ThreadTrace>
+  <ThreadTrace id="6" time="110">
+    <methods time="110" name="Method" class="Runner" />
+  </ThreadTrace>
+</rootTrace>
