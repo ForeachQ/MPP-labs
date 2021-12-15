@@ -11,7 +11,7 @@ namespace MainPart
 {
     public class Pipeline
     {
-        public Task Generate(IEnumerable<string> files, string pathToGenerated)
+        public Task Generate(IEnumerable<string> files, string pathToGenerated, ITestGenerator generator)
         {
             var execOptions = new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 2 };
             var linkOptions = new DataflowLinkOptions { PropagateCompletion = true };
@@ -21,7 +21,7 @@ namespace MainPart
                 {
                     using (var reader = new StreamReader(path))
                     {
-                        Console.WriteLine(Thread.CurrentThread.ManagedThreadId + "  reading " + path);
+                        Console.WriteLine("Readting...");
                         return await reader.ReadToEndAsync();
                        
                     }
@@ -33,9 +33,9 @@ namespace MainPart
                 async sourceCode =>
                 {
                     var fileInfo = await Task.Run(() => CodeAnalyzer.GetFileInfo(sourceCode));
-                    Console.WriteLine("zzz");
+                    Console.WriteLine("Generating...");
 
-                    return await Task.Run(() => TestsGenerator.GenerateTests(fileInfo));
+                    return await Task.Run(() => generator.GenerateTests(fileInfo));
                     
                 },
                 execOptions
@@ -44,10 +44,9 @@ namespace MainPart
             (
                 async fileNameCodePair =>
                 {
-                    Console.WriteLine("ohoho");
+                    Console.WriteLine("Writing...");
                     using (var writer = new StreamWriter(pathToGenerated + '\\' + fileNameCodePair.Key + ".cs"))
                     {
-                        Console.WriteLine("hhh"+fileNameCodePair.Key);
                         await writer.WriteAsync(fileNameCodePair.Value);
                     }
                 },
