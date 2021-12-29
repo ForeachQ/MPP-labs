@@ -14,6 +14,8 @@ namespace DependencyInjection.DependencyProvider
         static object locker = new object();
         private readonly DependencyConfig configuration;
         public readonly Dictionary<Type, List<SingletonContainer>> singletonObjects;
+        private readonly Stack<Type> cyclicStack = new Stack<Type>();
+        private Dictionary<Type, Type> moqObjects = new Dictionary<Type, Type>();
 
         public DependencyProvider(DependencyConfig configuration)
         {
@@ -35,6 +37,16 @@ namespace DependencyInjection.DependencyProvider
 
         public object Resolve(Type dependencyType, ImplNumber number = ImplNumber.Any)
         {
+
+            if (cyclicStack.Contains(dependencyType))
+            {
+                ////////////////////////////////////////////////////////////////////
+                return null;
+                ////////////////////////////////////////////////////////////////////
+            }
+
+            cyclicStack.Push(dependencyType);
+
             object result;
             if (this.IsIEnumerable(dependencyType))
             {
@@ -66,11 +78,34 @@ namespace DependencyInjection.DependencyProvider
                     {
                         var result = CreateInstance(dependencyType,implType);
                         this.AddToSingletonObjects(dependencyType, result, number);
+                        cyclicStack.Pop();
+                        ProcessMoqObjects(dependencyType);
                     }
                 }
             }
             return this.singletonObjects[dependencyType]
                    .Find(singletonContainer => number.HasFlag(singletonContainer.ImplNumber)).Instance;
+        }
+
+        private void ProcessMoqObjects(Type replaceType)
+        {
+            foreach(KeyValuePair<Type, Type> keyValuePair in moqObjects)
+            {
+                if (replaceType.Equals(keyValuePair.Value))
+                {
+                    object moqObj = Resolve(keyValuePair.Key, ImplNumber.Any);
+                    PropertyInfo[] propertyInfos = moqObj.GetType().GetProperties();
+                    for(int i = 0; i < propertyInfos.Length; i++)
+                    {
+                        if (propertyInfos[i].PropertyType.Equals(keyValuePair.Value)){
+                            cyclicStack.Pop();
+                            object replaceObject = Resolve(replaceType, ImplNumber.Any);
+                            moqObj.GetType().GetProperty(propertyInfos[i].Name).SetValue(moqObj, replaceObject);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         private object CreateInstance( Type dependecyType, Type implementationType)
@@ -87,6 +122,15 @@ namespace DependencyInjection.DependencyProvider
                     {
                         var number = parameterInfo.GetCustomAttribute<DependencyKeyAttribute>()?.ImplNumber ?? ImplNumber.Any;
                         parameter = Resolve(parameterInfo.ParameterType, number);
+                        if(parameter == null)
+                        {
+                            ///////////////////////////////////////////////////////////////////////
+                            if (!moqObjects.ContainsKey(dependecyType))
+                            {
+                                moqObjects.Add(dependecyType, parameterInfo.ParameterType);
+                            }
+                            ///////////////////////////////////////////////////////////////////////
+                        }
                     }
                     else
                     {
